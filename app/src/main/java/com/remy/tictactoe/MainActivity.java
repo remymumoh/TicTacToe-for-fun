@@ -1,13 +1,17 @@
 package com.remy.tictactoe;
 
+import android.animation.Animator;
 import android.animation.AnimatorSet;
+import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
+import android.annotation.TargetApi;
 import android.content.SharedPreferences;
 import android.content.res.AssetFileDescriptor;
 import android.graphics.Typeface;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.SoundPool;
+import android.os.Build;
 import android.os.Handler;
 import android.preference.PreferenceManager;
 import android.support.v7.app.AppCompatActivity;
@@ -219,7 +223,260 @@ public class MainActivity extends AppCompatActivity {
                 break;
         }
     }
+    // CELL_CLICK
+    void CELL_CLICK(View v) {
+        v.setEnabled(false);
 
+        // sound
+        if (!sp.getBoolean("mute", false) && isForeground)
+            sndpool.play(snd_click, 0.4f, 0.4f, 0, 0, 1);
 
+        // set cell icon
+        if (player1) {
+            ((ImageView) v).setImageResource(R.drawable.player1);
+            cells_values[Integer.valueOf(v.getTag().toString())] = 1;
+        } else {
+            ((ImageView) v).setImageResource(R.drawable.player2);
+            cells_values[Integer.valueOf(v.getTag().toString())] = 2;
+        }
+        player1 = !player1;
+        num_pressed++;
+
+        // check winner
+        if (check_winner(1)) {
+            // save result
+            SharedPreferences.Editor ed = sp.edit();
+            ed.putInt("player1", sp.getInt("player1", 0) + 1);
+            ed.commit();
+
+            STOP(1);
+            return;
+        }
+        if (check_winner(2)) {
+            // save result
+            SharedPreferences.Editor ed = sp.edit();
+            ed.putInt("player2", sp.getInt("player2", 0) + 1);
+            ed.commit();
+
+            STOP(2);
+            return;
+        }
+        // no winner
+        if (num_pressed == cells.size()) {
+            STOP(0);
+            return;
+        }
+
+        // computer go
+        if (single_game && player1)
+            h.postDelayed(computer_go, 500);
+    }
+
+    // computer_go
+    Runnable computer_go = new Runnable() {
+        @Override
+        public void run() {
+            if (comp_first && Math.random() > 0.5)
+                CELL_CLICK(cells.get(4));
+            else {
+                List<Integer> temp_array = new ArrayList<Integer>();
+
+                // get free cells
+                for (int i = 0; i < cells.size(); i++)
+                    if (cells.get(i).isEnabled())
+                        temp_array.add(i);
+
+                // click on random free cell
+                int random_cell = temp_array.get((int) Math.round(Math.random() * (temp_array.size() - 1)));
+                CELL_CLICK(cells.get(random_cell));
+            }
+
+            comp_first = false;
+        }
+    };
+
+    // show_main
+    Runnable show_main = new Runnable() {
+        public void run() {
+            findViewById(R.id.game).setVisibility(View.GONE);
+            findViewById(R.id.main).setVisibility(View.VISIBLE);
+            ((TextView) findViewById(R.id.txt_score)).setText(sp.getInt("player1", 0) + ":" + sp.getInt("player2", 0));
+        }
+    };
+
+    // STOP
+    void STOP(int result) {
+        num_games++;
+
+        // disable cells
+        for (int i = 0; i < cells.size(); i++)
+            cells.get(i).setEnabled(false);
+
+        // sound
+        if (!sp.getBoolean("mute", false) && isForeground && (result == 1 || result == 2))
+            sndpool.play(snd_win, 0.5f, 0.5f, 0, 0, 1);
+
+        // message
+        switch (result) {
+            case 0:
+                ((TextView) findViewById(R.id.mess)).setText(R.string.win0);
+                h.postDelayed(show_main, 2000);
+                break;
+            case 1:
+                if (single_game)
+                    ((TextView) findViewById(R.id.mess)).setText(R.string.win1_single);
+                else
+                    ((TextView) findViewById(R.id.mess)).setText(R.string.win1_multiple);
+                h.postDelayed(show_main, 3000);
+                break;
+            case 2:
+                if (single_game)
+                    ((TextView) findViewById(R.id.mess)).setText(R.string.win2_single);
+                else
+                    ((TextView) findViewById(R.id.mess)).setText(R.string.win2_multiple);
+                h.postDelayed(show_main, 3000);
+                break;
+        }
+        findViewById(R.id.mess).setVisibility(View.VISIBLE);
+
+    }
+
+    // check_winner
+    boolean check_winner(int player) {
+        if (cells_values[0] == player && cells_values[1] == player && cells_values[2] == player) {
+            show_animation(new int[] { 0, 1, 2 });
+            return true;
+        }
+
+        if (cells_values[3] == player && cells_values[4] == player && cells_values[5] == player) {
+            show_animation(new int[] { 3, 4, 5 });
+            return true;
+        }
+
+        if (cells_values[6] == player && cells_values[7] == player && cells_values[8] == player) {
+            show_animation(new int[] { 6, 7, 8 });
+            return true;
+        }
+
+        if (cells_values[0] == player && cells_values[3] == player && cells_values[6] == player) {
+            show_animation(new int[] { 0, 3, 6 });
+            return true;
+        }
+
+        if (cells_values[1] == player && cells_values[4] == player && cells_values[7] == player) {
+            show_animation(new int[] { 1, 4, 7 });
+            return true;
+        }
+
+        if (cells_values[2] == player && cells_values[5] == player && cells_values[8] == player) {
+            show_animation(new int[] { 2, 5, 8 });
+            return true;
+        }
+
+        if (cells_values[0] == player && cells_values[4] == player && cells_values[8] == player) {
+            show_animation(new int[] { 0, 4, 8 });
+            return true;
+        }
+
+        if (cells_values[2] == player && cells_values[4] == player && cells_values[6] == player) {
+            show_animation(new int[] { 2, 4, 6 });
+            return true;
+        }
+
+        return false;
+    }
+
+    // show_animation
+    void show_animation(int[] array) {
+        // AnimatorSet
+        List<Animator> anim_list = new ArrayList<Animator>();
+
+        // create animation
+        for (int i = 0; i < array.length; i++) {
+            ObjectAnimator anim = ObjectAnimator.ofFloat(cells.get(array[i]), "scaleX", 0.5f);
+            anim.setRepeatCount(5);
+            anim.setRepeatMode(ObjectAnimator.REVERSE);
+            anim_list.add(anim);
+
+            anim = ObjectAnimator.ofFloat(cells.get(array[i]), "scaleY", 0.5f);
+            anim.setRepeatCount(5);
+            anim.setRepeatMode(ObjectAnimator.REVERSE);
+            anim_list.add(anim);
+        }
+
+        // animate
+        anim = new AnimatorSet();
+        anim.playTogether(anim_list);
+        anim.setDuration(200);
+        anim.start();
+    }
+
+    // DpToPx
+    float DpToPx(float dp) {
+        return (dp * Math.max(getResources().getDisplayMetrics().widthPixels, getResources().getDisplayMetrics().heightPixels) / 500f);
+    }
+    // hide_navigation_bar
+    @TargetApi(Build.VERSION_CODES.KITKAT)
+    void hide_navigation_bar() {
+        // fullscreen mode
+        if (android.os.Build.VERSION.SDK_INT >= 19) {
+            getWindow().getDecorView().setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+        }
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus)
+            hide_navigation_bar();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        isForeground = true;
+
+        if (!sp.getBoolean("mute", false) && isForeground)
+            mp.setVolume(0.5f, 0.5f);
+    }
+
+    @Override
+    protected void onPause() {
+        isForeground = false;
+        mp.setVolume(0, 0);
+        super.onPause();
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (findViewById(R.id.main).getVisibility() == View.VISIBLE)
+            super.onBackPressed();
+        else {
+            findViewById(R.id.main).setVisibility(View.VISIBLE);
+            h.removeCallbacks(show_main);
+            h.removeCallbacks(computer_go);
+
+            if (anim != null)
+                anim.cancel();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        h.removeCallbacks(show_main);
+        h.removeCallbacks(computer_go);
+        sndpool.release();
+        mp.release();
+
+        if (anim != null)
+            anim.cancel();
+
+        // destroy AdMob
+
+        super.onDestroy();
+    }
 }
-}
+
